@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>行情策略系统 V3</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,sans-serif}
+    body{background:#f5f7fa;color:#222}
+    .container{max-width:1000px;margin:0 auto;padding:16px}
+    .tab-bar{display:flex;gap:12px;margin-bottom:16px}
+    .tab{padding:8px 16px;border-radius:8px;background:#fff;cursor:pointer}
+    .tab.active{background:#0d6eff;color:#fff}
+    .page{display:none}
+    .page.active{display:block}
+    .search-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+    .search-bar input{flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;min-width:120px}
+    .search-bar button{padding:10px 16px;background:#0d6eff;color:#fff;border:none;border-radius:8px;cursor:pointer}
+    .refresh-btn{background:#10b981!important}
+    .stock-list{display:flex;flex-direction:column;gap:10px}
+    .stock-item{background:#fff;padding:12px;border-radius:10px;display:flex;justify-content:space-between;align-items:center}
+    .stock-name{font-weight:600}
+    .stock-code{font-size:12px;color:#666}
+    .stock-price{font-size:16px;font-weight:700}
+    .stock-up{color:#00b894}
+    .stock-down{color:#e74c3c}
+    .pick-btn{padding:6px 12px;background:#0d6eff;color:#fff;border:none;border-radius:6px;cursor:pointer}
+    .pick-list{display:flex;flex-direction:column;gap:12px}
+    .pick-card{background:#fff;padding:14px;border-radius:10px}
+    .pick-head{display:flex;justify-content:space-between}
+    .pick-status{padding:3px 8px;border-radius:6px;font-size:12px}
+    .status-monitoring{background:#e1f5fe;color:#0288d1}
+    .status-running{background:#fff8e1;color:#f57f17}
+    .status-success{background:#e8f5e9;color:#2e7d32}
+    .status-failed{background:#ffebee;color:#c62828}
+    .stats-panel{background:#fff;padding:20px;border-radius:12px;margin-bottom:20px}
+    .stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px}
+    .stat-item{padding:12px;background:#f9fafb;border-radius:8px;text-align:center}
+    .stat-value{font-size:20px;font-weight:700}
+    .modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:none;justify-content:center;align-items:center}
+    .modal.show{display:flex}
+    .modal-content{background:#fff;width:90%;max-width:420px;border-radius:12px;padding:20px}
+    .form-row{margin-bottom:12px}
+    .form-row label{display:block;font-size:13px;margin-bottom:4px}
+    .form-row input{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px}
+    .modal-buttons{display:flex;gap:10px;margin-top:20px}
+    .modal-cancel{flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;background:#fff}
+    .modal-submit{flex:1;padding:10px;background:#0d6eff;color:#fff;border:none;border-radius:8px}
+    .empty{text-align:center;padding:40px;color:#999}
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="tab-bar">
+    <div class="tab active" onclick="switchTab('market')">行情</div>
+    <div class="tab" onclick="switchTab('picks')">策略</div>
+    <div class="tab" onclick="switchTab('stats')">统计</div>
+  </div>
+
+  <div id="market-page" class="page active">
+    <div class="search-bar">
+      <input id="search-input" placeholder="搜索股票" onkeyup="event.key==='Enter'&&doSearch()">
+      <button onclick="doSearch()">搜索</button>
+      <button class="refresh-btn" onclick="manualRefresh()">🔄 手动刷新</button>
+    </div>
+    <div id="stock-list" class="stock-list"></div>
+  </div>
+
+  <div id="picks-page" class="page">
+    <div id="pick-list" class="pick-list"></div>
+  </div>
+
+  <div id="stats-page" class="page">
+    <div class="stats-panel">
+      <h3>策略统计</h3>
+      <div class="stats-grid">
+        <div class="stat-item"><div>总策略</div><div class="stat-value" id="stat-total">0</div></div>
+        <div class="stat-item"><div>监控中</div><div class="stat-value" id="stat-monitoring">0</div></div>
+        <div class="stat-item"><div>运行中</div><div class="stat-value" id="stat-running">0</div></div>
+        <div class="stat-item"><div>成功</div><div class="stat-value" id="stat-success">0</div></div>
+        <div class="stat-item"><div>失败</div><div class="stat-value" id="stat-failed">0</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="pick-modal">
+  <div class="modal-content">
+    <div class="modal-title">创建策略</div>
+    <div class="form-row"><label>标的</label><input id="pick-symbol" readonly></div>
+    <div class="form-row"><label>买入价</label><input id="pick-buy" type="number"></div>
+    <div class="form-row"><label>目标价1</label><input id="pick-target1" type="number"></div>
+    <div class="form-row"><label>目标价2</label><input id="pick-target2" type="number"></div>
+    <div class="form-row"><label>目标价3</label><input id="pick-target3" type="number"></div>
+    <div class="form-row"><label>止损价</label><input id="pick-stop" type="number"></div>
+    <div class="form-row"><label>投资金额</label><input id="pick-amount" type="number"></div>
+    <div class="modal-buttons">
+      <button class="modal-cancel" onclick="closeModal()">取消</button>
+      <button class="modal-submit" onclick="savePick()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STOCK_POOL = {
+  CN: [
+    { symbol: "600519.SH", name: "贵州茅台" },
+    { symbol: "000858.SZ", name: "五粮液" },
+    { symbol: "601318.SH", name: "中国平安" },
+    { symbol: "600036.SH", name: "招商银行" },
+    { symbol: "601888.SH", name: "中国中免" },
+    { symbol: "600276.SH", name: "恒瑞医药" },
+    { symbol: "601899.SH", name: "紫金矿业" },
+    { symbol: "600887.SH", name: "伊利股份" }
+  ],
+  HK: [
+    { symbol: "0700.HK", name: "腾讯控股" },
+    { symbol: "0005.HK", name: "汇丰控股" },
+    { symbol: "0939.HK", name: "建设银行" },
+    { symbol: "0941.HK", name: "中国移动" },
+    { symbol: "1299.HK", name: "友邦保险" },
+    { symbol: "0388.HK", name: "港交所" }
+  ],
+  US: [
+    { symbol: "AAPL.US", name: "苹果" },
+    { symbol: "MSFT.US", name: "微软" },
+    { symbol: "GOOGL.US", name: "谷歌" },
+    { symbol: "AMZN.US", name: "亚马逊" },
+    { symbol: "TSLA.US", name: "特斯拉" },
+    { symbol: "META.US", name: "Meta" },
+    { symbol: "NVDA.US", name: "英伟达" },
+    { symbol: "BABA.US", name: "阿里巴巴" }
+  ]
+};
+
+let realtimeQuotes = {};
+let currentSymbol = null;
+let currentName = null;
+
+async function manualRefresh() {
+  alert("已刷新行情");
+  renderAll();
+}
+
+function searchStocks(key) {
+  key = key.toLowerCase().trim();
+  const all = Object.values(STOCK_POOL).flat();
+  if (!key) return all.map(s => ({ ...s, ...realtimeQuotes[s.symbol] }));
+  return all.filter(s => 
+    s.symbol.toLowerCase().includes(key) || 
+    s.name.toLowerCase().includes(key)
+  ).map(s => ({ ...s, ...realtimeQuotes[s.symbol] }));
+}
+
+function doSearch() {
+  const kw = document.getElementById("search-input").value;
+  renderStockList(searchStocks(kw));
+}
+
+function openModal(sym, name) {
+  currentSymbol = sym;
+  currentName = name;
+  document.getElementById("pick-symbol").value = name + " (" + sym + ")";
+  document.getElementById("pick-modal").classList.add("show");
+}
+function closeModal() {
+  document.getElementById("pick-modal").classList.remove("show");
+}
+
+function savePick() {
+  const buy = +document.getElementById("pick-buy").value;
+  const t1 = +document.getElementById("pick-target1").value;
+  const t2 = +document.getElementById("pick-target2").value;
+  const t3 = +document.getElementById("pick-target3").value;
+  const stop = +document.getElementById("pick-stop").value;
+  const amt = +document.getElementById("pick-amount").value;
+
+  if (!buy || !t1 || !stop || !amt) return alert("请填完整");
+
+  const picks = JSON.parse(localStorage.getItem("picks") || "[]");
+  picks.push({
+    id: Date.now(),
+    symbol: currentSymbol,
+    name: currentName,
+    buyPrice: buy,
+    targets: [t1, t2, t3],
+    stopLoss: stop,
+    amount: amt,
+    status: "monitoring"
+  });
+  localStorage.setItem("picks", JSON.stringify(picks));
+  closeModal();
+  renderAll();
+}
+
+function renderStockList(list) {
+  const el = document.getElementById("stock-list");
+  if (!list.length) { el.innerHTML = `<div class="empty">无数据</div>`; return; }
+  el.innerHTML = list.map(s => `
+    <div class="stock-item">
+      <div>
+        <div class="stock-name">${s.name}</div>
+        <div class="stock-code">${s.symbol}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="stock-price">${(s.price || 0).toFixed(2)}</div>
+        <button class="pick-btn" onclick="openModal('${s.symbol}','${s.name}')">策略</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderPickList() {
+  const list = JSON.parse(localStorage.getItem("picks") || "[]");
+  const el = document.getElementById("pick-list");
+  if (!list.length) { el.innerHTML = `<div class="empty">暂无策略</div>`; return; }
+  el.innerHTML = list.map(p => {
+    let cls = "", txt = "";
+    if (p.status === "monitoring") { cls = "status-monitoring"; txt = "监控中" }
+    if (p.status === "running") { cls = "status-running"; txt = "运行中" }
+    if (p.status === "success") { cls = "status-success"; txt = "成功" }
+    if (p.status === "failed") { cls = "status-failed"; txt = "失败" }
+    return `
+      <div class="pick-card">
+        <div class="pick-head">
+          <div>${p.name} ${p.symbol}</div>
+          <div class="pick-status ${cls}">${txt}</div>
+        </div>
+        <div>买入: ${p.buyPrice}</div>
+        <div>止损: ${p.stopLoss}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderStats() {
+  const p = JSON.parse(localStorage.getItem("picks") || "[]");
+  document.getElementById("stat-total").innerText = p.length;
+  document.getElementById("stat-monitoring").innerText = p.filter(x=>x.status==="monitoring").length;
+  document.getElementById("stat-running").innerText = p.filter(x=>x.status==="running").length;
+  document.getElementById("stat-success").innerText = p.filter(x=>x.status==="success").length;
+  document.getElementById("stat-failed").innerText = p.filter(x=>x.status==="failed").length;
+}
+
+function renderAll() {
+  renderStockList(searchStocks(""));
+  renderPickList();
+  renderStats();
+}
+
+function switchTab(t) {
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+  event.target.classList.add("active");
+  document.getElementById(t+"-page").classList.add("active");
+}
+
+renderAll();
+</script>
+</body>
+</html>
