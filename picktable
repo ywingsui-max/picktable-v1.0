@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>投资策略追踪系统 V3</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: #f5f7fa; color: #222; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 16px; }
+    .tab-bar { display: flex; gap: 12px; margin-bottom: 16px; }
+    .tab { padding: 8px 16px; border-radius: 8px; background: white; cursor: pointer; font-weight: 500; }
+    .tab.active { background: #0d6eff; color: white; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .search-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .search-bar input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; min-width: 120px; }
+    .search-bar button { padding: 10px 16px; background: #0d6eff; color: white; border: none; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+
+    .stock-list { display: flex; flex-direction: column; gap: 10px; }
+    .stock-item { background: white; padding: 12px 14px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .stock-info { display: flex; flex-direction: column; gap: 4px; }
+    .stock-name { font-weight: 600; }
+    .stock-code { font-size: 12px; color: #666; }
+    .stock-price { font-size: 16px; font-weight: 700; }
+    .stock-change { font-size: 13px; margin-left: 8px; }
+    .stock-up { color: #00b894; }
+    .stock-down { color: #e74c3c; }
+    .pick-btn { padding: 6px 12px; background: #0d6eff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+
+    /* 策略卡片 */
+    .pick-list { display: flex; flex-direction: column; gap: 12px; }
+    .pick-card { background: white; padding: 14px; border-radius: 10px; position: relative; }
+    .pick-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .pick-symbol { font-weight: 600; }
+    .pick-status { padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+    .status-monitoring { background: #e1f5fe; color: #0288d1; }
+    .status-running { background: #fff8e1; color: #f57f17; }
+    .status-success { background: #e8f5e9; color: #2e7d32; }
+    .status-failed { background: #ffebee; color: #c62828; }
+    .pick-row { display: flex; gap: 12px; font-size: 13px; color: #444; margin-top: 4px; flex-wrap: wrap; }
+
+    /* 统计面板 */
+    .stats-panel { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
+    .stat-item { padding: 12px; background: #f9fafb; border-radius: 8px; text-align: center; }
+    .stat-value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+    .stat-label { font-size: 13px; color: #666; }
+
+    /* 弹窗 */
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 999; }
+    .modal.show { display: flex; }
+    .modal-content { background: white; width: 90%; max-width: 420px; border-radius: 12px; padding: 20px; }
+    .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+    .form-row { margin-bottom: 12px; }
+    .form-row label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
+    .form-row input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-cancel { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; }
+    .modal-submit { flex: 1; padding: 10px; background: #0d6eff; color: white; border: none; border-radius: 8px; cursor: pointer; }
+
+    .empty { text-align: center; padding: 40px 20px; color: #999; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="tab-bar">
+    <div class="tab active" onclick="switchTab('market')">行情</div>
+    <div class="tab" onclick="switchTab('picks')">策略列表</div>
+    <div class="tab" onclick="switchTab('stats')">统计</div>
+  </div>
+
+  <!-- 行情页 -->
+  <div id="market-page" class="page active">
+    <div class="search-bar">
+      <input id="search-input" placeholder="搜索股票名称/代码" onkeyup="if(event.key==='Enter') doSearch()">
+      <button onclick="doSearch()">搜索</button>
+      <!-- 手动刷新按钮 -->
+      <button onclick="manualRefresh()" style="background: #10b981;">🔄 手动刷新行情</button>
+    </div>
+    <div id="stock-list" class="stock-list"></div>
+  </div>
+
+  <!-- 策略列表页 -->
+  <div id="picks-page" class="page">
+    <div id="pick-list" class="pick-list"></div>
+  </div>
+
+  <!-- 统计页 -->
+  <div id="stats-page" class="page">
+    <div class="stats-panel">
+      <h3>策略统计</h3>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-label">总策略数</div>
+          <div class="stat-value" id="stat-total">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">监控中</div>
+          <div class="stat-value" id="stat-monitoring">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">运行中</div>
+          <div class="stat-value" id="stat-running">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-item">
+          <div class="stat-label">成功</div>
+          <div class="stat-value" id="stat-success">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">失败</div>
+          <div class="stat-value" id="stat-failed">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pick 弹窗 -->
+<div class="modal" id="pick-modal">
+  <div class="modal-content">
+    <div class="modal-title">创建 Pick 策略</div>
+    <div class="form-row">
+      <label>标的</label>
+      <input type="text" id="pick-symbol" readonly>
+    </div>
+    <div class="form-row">
+      <label>买入价格</label>
+      <input type="number" step="0.001" id="pick-buy" placeholder="请输入买入价">
+    </div>
+    <div class="form-row">
+      <label>目标价一（必填）</label>
+      <input type="number" step="0.001" id="pick-target1" placeholder="目标价一">
+    </div>
+    <div class="form-row">
+      <label>目标价二（选填）</label>
+      <input type="number" step="0.001" id="pick-target2" placeholder="目标价二">
+    </div>
+    <div class="form-row">
+      <label>目标价三（选填）</label>
+      <input type="number" step="0.001" id="pick-target3" placeholder="目标价三">
+    </div>
+    <div class="form-row">
+      <label>止损价（必填）</label>
+      <input type="number" step="0.001" id="pick-stop" placeholder="止损价">
+    </div>
+    <div class="form-row">
+      <label>投资金额</label>
+      <input type="number" id="pick-amount" placeholder="投资金额">
+    </div>
+    <div class="modal-buttons">
+      <button class="modal-cancel" onclick="closePickModal()">取消</button>
+      <button class="modal-submit" onclick="submitPick()">提交</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==============================================
+// 全局数据
+// ==============================================
+const STOCK_POOL = {
+  CN: [
+    { symbol: "600519.SH", name: "贵州茅台", market: "CN" },
+    { symbol: "000858.SZ", name: "五粮液", market: "CN" },
+    { symbol: "601318.SH", name: "中国平安", market: "CN" },
+    { symbol: "600036.SH", name: "招商银行", market: "CN" },
+    { symbol: "601888.SH", name: "中国中免", market: "CN" },
+    { symbol: "600276.SH", name: "恒瑞医药", market: "CN" },
+    { symbol: "601899.SH", name: "紫金矿业", market: "CN" },
+    { symbol: "600887.SH", name: "伊利股份", market: "CN" },
+  ],
+  HK: [
+    { symbol: "0700.HK", name: "腾讯控股", market: "HK" },
+    { symbol: "0005.HK", name: "汇丰控股", market: "HK" },
+    { symbol: "0939.HK", name: "建设银行", market: "HK" },
+    { symbol: "0941.HK", name: "中国移动", market: "HK" },
+    { symbol: "1299.HK", name: "友邦保险", market: "HK" },
+    { symbol: "0388.HK", name: "香港交易所", market: "HK" },
+  ],
+  US: [
+    { symbol: "AAPL.US", name: "苹果公司", market: "US" },
+    { symbol: "MSFT.US", name: "微软", market: "US" },
+    { symbol: "GOOGL.US", name: "谷歌", market: "US" },
+    { symbol: "AMZN.US", name: "亚马逊", market: "US" },
+    { symbol: "TSLA.US", name: "特斯拉", market: "US" },
+    { symbol: "META.US", name: "Meta", market: "US" },
+    { symbol: "NVDA.US", name: "英伟达", market: "US" },
+    { symbol: "BABA.US", name: "阿里巴巴", market: "US" },
+  ]
+};
+
+let realtimeQuotes = {};
+let currentPickSymbol = null;
+let currentPickName = null;
+
+// ==============================================
+// iTick WebSocket + HTTP 100ms 兜底
+// ==============================================
+const ITCK_WS = "wss://ws.itick.dev/ws";
+const ITCK_API = "https://api.itick.dev/v1";
+let ws = null;
+let wsConnected = false;
+let httpTimer = null;
+
+function toItick(s) {
+  return s.replace(".SH",".ss").replace(".SZ",".sz").replace(".HK",".hk").replace(".US",".us");
+}
+function fromItick(s) {
+  return s.replace(".ss",".SH").replace(".sz",".SZ").replace(".hk",".HK").replace(".us",".US");
+}
+
+function connectWS() {
+  if (ws) ws.close();
+  ws = new WebSocket(ITCK_WS);
+  ws.onopen = () => {
+    wsConnected = true;
+    const symbols = Object.values(STOCK_POOL).flat().map(s => toItick(s.symbol));
+    ws.send(JSON.stringify({ cmd:"subscribe", symbols }));
+  };
+  ws.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (d.type === "tick") {
+        const sym = fromItick(d.symbol);
+        realtimeQuotes[sym] = {
+          symbol: sym,
+          name: d.name || sym,
+          price: +(d.price || 0).toFixed(3),
+          change: +(d.change || 0).toFixed(3),
+          changePercent: +(d.changePercent || 0).toFixed(2),
+          time: Date.now()
+        };
+      }
+    } catch (e) {}
+  };
+  ws.onclose = () => { wsConnected = false; setTimeout(connectWS, 2000); };
+  ws.onerror = () => { wsConnected = false; };
+}
+
+async function fetchHttp() {
+  try {
+    const all = Object.values(STOCK_POOL).flat();
+    const symbols = all.map(s => toItick(s.symbol)).join(",");
+    const r = await fetch(`${ITCK_API}/quotes?symbols=${symbols}`);
+    const j = await r.json();
+    if (j.data) {
+      j.data.forEach(item => {
+        const sym = fromItick(item.symbol);
+        realtimeQuotes[sym] = {
+          symbol: sym,
+          name: item.name || sym,
+          price: +(item.price || item.close || 0).toFixed(3),
+          change: +(item.change || 0).toFixed(3),
+          changePercent: +(item.changePercent || 0).toFixed(2),
+        };
+      });
+    }
+  } catch (e) {}
+}
+
+function startHttp() {
+  clearInterval(httpTimer);
+  fetchHttp();
+  httpTimer = setInterval(fetchHttp, 100);
+}
+
+// ==============================================
+// 手动刷新行情（新增）
+// ==============================================
+async function manualRefresh() {
+  await fetchHttp();
+  renderAll();
+  alert("✅ 行情已手动刷新完成！");
+}
+
+// ==============================================
+// 搜索（完美支持中文）
+// ==============================================
+function searchStocks(keyword) {
+  keyword = keyword.toLowerCase().trim();
+  const all = Object.values(STOCK_POOL).flat();
+  if (!keyword) return all.map(s => ({ ...s, ...realtimeQuotes[s.symbol] }));
+  return all.filter(s => {
+    const code = s.symbol.toLowerCase();
+    const name = s.name.toLowerCase();
+    return code.includes(keyword) || name.includes(keyword);
+  }).map(s => ({ ...s, ...realtimeQuotes[s.symbol] }));
+}
+
+function doSearch() {
+  const kw = document.getElementById("search-input").value;
+  renderStockList(searchStocks(kw));
+}
+
+// ==============================================
+// 本地存储 & 策略逻辑
+// ==============================================
+function initStorage() {
+  if (!localStorage.getItem("picks")) localStorage.setItem("picks", "[]");
+}
+function getPicks() { return JSON.parse(localStorage.getItem("picks") || "[]"); }
+function setPicks(list) { localStorage.setItem("picks", JSON.stringify(list)); }
+
+function checkTriggers() {
+  const picks = getPicks();
+  let changed = false;
+  picks.forEach(p => {
+    const q = realtimeQuotes[p.symbol];
+    if (!q || !q.price) return;
+    const px = q.price;
+
+    if (p.status === "monitoring" && px <= p.buyPrice) {
+      p.status = "running";
+      p.updatedAt = Date.now();
+      changed = true;
+    }
+
+    if (p.status === "running") {
+      const hitTarget = p.targets.some(t => t && px >= t);
+      const hitStop = px <= p.stopLoss;
+      if (hitTarget) {
+        p.status = "success";
+        changed = true;
+      }
+      if (hitStop) {
+        p.status = "failed";
+        changed = true;
+      }
+    }
+  });
+  if (changed) setPicks(picks);
+}
+
+// ==============================================
+// 弹窗
+// ==============================================
+function openPickModal(symbol, name) {
+  currentPickSymbol = symbol;
+  currentPickName = name;
+  document.getElementById("pick-symbol").value = `${name} (${symbol})`;
+  document.getElementById("pick-buy").value = "";
+  document.getElementById("pick-target1").value = "";
+  document.getElementById("pick-target2").value = "";
+  document.getElementById("pick-target3").value = "";
+  document.getElementById("pick-stop").value = "";
+  document.getElementById("pick-amount").value = "";
+  document.getElementById("pick-modal").classList.add("show");
+}
+function closePickModal() {
+  document.getElementById("pick-modal").classList.remove("show");
+}
+
+function submitPick() {
+  const buy = +document.getElementById("pick-buy").value;
+  const t1 = +document.getElementById("pick-target1").value;
+  const t2 = +document.getElementById("pick-target2").value || null;
+  const t3 = +document.getElementById("pick-target3").value || null;
+  const stop = +document.getElementById("pick-stop").value;
+  const amount = +document.getElementById("pick-amount").value;
+
+  if (!buy || !t1 || !stop || !amount) {
+    alert("请填写必填项");
+    return;
+  }
+
+  const pick = {
+    id: "pick_" + Date.now(),
+    symbol: currentPickSymbol,
+    name: currentPickName,
+    buyPrice: buy,
+    targets: [t1, t2, t3],
+    stopLoss: stop,
+    amount: amount,
+    status: "monitoring",
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  const list = getPicks();
+  list.push(pick);
+  setPicks(list);
+  closePickModal();
+  renderAll();
+}
+
+// ==============================================
+// 渲染
+// ==============================================
+function renderStockList(list) {
+  const el = document.getElementById("stock-list");
+  if (!list.length) {
+    el.innerHTML = `<div class="empty">暂无数据</div>`;
+    return;
+  }
+  el.innerHTML = list.map(s => `
+    <div class="stock-item">
+      <div class="stock-info">
+        <div class="stock-name">${s.name}</div>
+        <div class="stock-code">${s.symbol}</div>
+      </div>
+      <div style="display:flex;align-items:center;">
+        <div class="stock-price">${s.price?.toFixed(2) || "--"}</div>
+        <div class="stock-change ${s.change >= 0 ? 'stock-up' : 'stock-down'}">
+          ${s.change >= 0 ? '+' : ''}${s.changePercent || 0}%
+        </div>
+        <button class="pick-btn" onclick="openPickModal('${s.symbol}','${s.name}')">Pick</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderPickList() {
+  const list = getPicks();
+  const el = document.getElementById("pick-list");
+  if (!list.length) {
+    el.innerHTML = `<div class="empty">还未创建任何 Pick 策略</div>`;
+    return;
+  }
+  el.innerHTML = list.map(p => {
+    let cls = "";
+    let text = "";
+    if (p.status === "monitoring") { cls = "status-monitoring"; text = "监控中"; }
+    if (p.status === "running") { cls = "status-running"; text = "运行中"; }
+    if (p.status === "success") { cls = "status-success"; text = "成功"; }
+    if (p.status === "failed") { cls = "status-failed"; text = "失败"; }
+
+    const targets = p.targets.filter(t => t).map(t => t.toFixed(2)).join(" / ");
+    return `
+      <div class="pick-card">
+        <div class="pick-head">
+          <div class="pick-symbol">${p.name} ${p.symbol}</div>
+          <div class="pick-status ${cls}">${text}</div>
+        </div>
+        <div class="pick-row">买入价: ${p.buyPrice.toFixed(2)}</div>
+        <div class="pick-row">目标价: ${targets}</div>
+        <div class="pick-row">止损价: ${p.stopLoss.toFixed(2)}</div>
+        <div class="pick-row">投资金额: ${p.amount}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderStats() {
+  const picks = getPicks();
+  const total = picks.length;
+  const monitoring = picks.filter(p => p.status === "monitoring").length;
+  const running = picks.filter(p => p.status === "running").length;
+  const success = picks.filter(p => p.status === "success").length;
+  const failed = picks.filter(p => p.status === "failed").length;
+
+  document.getElementById("stat-total").innerText = total;
+  document.getElementById("stat-monitoring").innerText = monitoring;
+  document.getElementById("stat-running").innerText = running;
+  document.getElementById("stat-success").innerText = success;
+  document.getElementById("stat-failed").innerText = failed;
+}
+
+function renderAll() {
+  renderStockList(searchStocks(""));
+  renderPickList();
+  renderStats();
+}
+
+// ==============================================
+// 页面切换
+// ==============================================
+function switchTab(tab) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  event.target.classList.add("active");
+  document.getElementById(`${tab}-page`).classList.add("active");
+}
+
+// ==============================================
+// 启动
+// ==============================================
+initStorage();
+connectWS();
+startHttp();
+renderAll();
+
+setInterval(() => {
+  checkTriggers();
+  renderAll();
+}, 1000);
+</script>
+</body>
+</html>
