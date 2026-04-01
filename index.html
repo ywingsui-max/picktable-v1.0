@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="no-referrer">
-  <title>Pick Table - 策略追踪系统</title>
-  <!-- Supabase SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>PickTable V1 </title>
   <style>
     /* 保持原有样式不变 */
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -42,33 +40,13 @@
     .error { text-align: center; padding: 40px; color: #e74c3c; }
     .retry-btn { margin-top: 10px; padding: 8px 16px; background: #0d6eff; color: white; border: none; border-radius: 6px; cursor: pointer; }
     .last-update { text-align: center; font-size: 12px; color: #999; margin-top: 10px; }
-    /* 用户相关样式 */
-    .header { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; margin-bottom: 8px; }
-    .brand { font-size: 20px; font-weight: bold; color: #000; }
-    .user-area { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-    .avatar { width: 36px; height: 36px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    .avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .avatar-placeholder { color: #999; font-size: 14px; }
-    .nickname { font-size: 14px; color: #333; }
-    .login-btn { padding: 6px 14px; background: #0d6eff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
-    .logout-btn { padding: 4px 10px; background: none; color: #999; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 12px; }
-    .code-display { background: #f0f0f0; padding: 15px; border-radius: 8px; text-align: center; margin: 15px 0; }
-    .code-display .code { font-size: 28px; font-weight: bold; letter-spacing: 8px; color: #0d6eff; }
-    .code-display .hint { font-size: 12px; color: #999; margin-top: 5px; }
-    .avatar-upload { width: 80px; height: 80px; border-radius: 50%; background: #f0f0f0; margin: 0 auto 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px dashed #ddd; }
-    .avatar-upload img { width: 100%; height: 100%; object-fit: cover; }
-    .avatar-upload:hover { border-color: #0d6eff; }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <!-- 顶部栏：品牌 + 用户信息 -->
-  <div class="header">
-    <span class="brand">Pick Table</span>
-    <div id="user-area">
-      <!-- 动态渲染登录按钮或用户信息 -->
-    </div>
+  <div style="text-align: center; padding: 12px 0; margin-bottom: 8px;">
+    <span style="font-size: 20px; font-weight: bold; color: #000;">Pick Table</span>
   </div>
   <div class="tab-bar">
     <div class="tab active" data-tab="market" onclick="switchTab('market', this)">行情</div>
@@ -126,313 +104,9 @@
   </div>
 </div>
 
-<!-- 登录弹窗 -->
-<div class="modal" id="login-modal">
-  <div class="modal-content">
-    <h3 style="margin-bottom:15px; text-align:center;">登录 / 注册</h3>
-    <div class="form-row">
-      <label>手机号</label>
-      <input type="tel" id="login-phone" placeholder="请输入手机号" maxlength="11">
-    </div>
-    <div id="code-area" style="display:none;">
-      <div class="code-display">
-        <div class="code" id="verify-code">------</div>
-        <div class="hint">请输入上方验证码（模拟验证）</div>
-      </div>
-      <div class="form-row">
-        <label>验证码</label>
-        <input type="text" id="login-code" placeholder="请输入验证码" maxlength="6">
-      </div>
-    </div>
-    <div class="modal-buttons" style="display:flex; gap:10px; margin-top:20px;">
-      <button onclick="closeLoginModal()" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd; background:white;">取消</button>
-      <button id="login-submit-btn" onclick="handleLoginSubmit()" style="flex:1; padding:10px; border-radius:8px; border:none; background:#0d6eff; color:white;">获取验证码</button>
-    </div>
-  </div>
-</div>
-
-<!-- 用户信息编辑弹窗 -->
-<div class="modal" id="profile-modal">
-  <div class="modal-content">
-    <h3 style="margin-bottom:15px; text-align:center;">个人信息</h3>
-    <div class="avatar-upload" onclick="document.getElementById('avatar-input').click()">
-      <img id="profile-avatar" src="" style="display:none;">
-      <span id="avatar-placeholder" class="avatar-placeholder">点击上传</span>
-    </div>
-    <input type="file" id="avatar-input" accept="image/*" style="display:none;" onchange="handleAvatarChange(event)">
-    <div class="form-row">
-      <label>昵称</label>
-      <input type="text" id="profile-nickname" placeholder="请输入昵称">
-    </div>
-    <div class="form-row">
-      <label>手机号</label>
-      <input type="text" id="profile-phone" readonly style="background:#f5f5f5;">
-    </div>
-    <div class="modal-buttons" style="display:flex; gap:10px; margin-top:20px;">
-      <button onclick="closeProfileModal()" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd; background:white;">取消</button>
-      <button onclick="saveProfile()" style="flex:1; padding:10px; border-radius:8px; border:none; background:#0d6eff; color:white;">保存</button>
-    </div>
-    <div style="text-align:center; margin-top:15px;">
-      <button onclick="logout()" class="logout-btn">退出登录</button>
-    </div>
-  </div>
-</div>
-
 <script>
 // ==============================================
-// 0. Supabase 配置
-// ==============================================
-// 请替换为你的 Supabase 项目信息
-const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // 例如: https://xxxxx.supabase.co
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-
-// 初始化 Supabase 客户端
-let supabase = null;
-let currentUser = null; // 当前登录用户
-let tempVerifyCode = ''; // 临时存储验证码
-
-function initSupabase() {
-  if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && window.supabase) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    return true;
-  }
-  return false;
-}
-
-// ==============================================
-// 1. 用户管理
-// ==============================================
-// 从本地存储加载用户
-function loadUserFromLocal() {
-  const userData = localStorage.getItem('pick_table_user');
-  if (userData) {
-    currentUser = JSON.parse(userData);
-    return true;
-  }
-  return false;
-}
-
-// 保存用户到本地存储
-function saveUserToLocal(user) {
-  localStorage.setItem('pick_table_user', JSON.stringify(user));
-}
-
-// 渲染用户区域
-function renderUserArea() {
-  const userArea = document.getElementById('user-area');
-  if (currentUser) {
-    const avatarHtml = currentUser.avatar_url 
-      ? `<img src="${currentUser.avatar_url}" alt="">` 
-      : `<span class="avatar-placeholder">${currentUser.nickname ? currentUser.nickname[0] : '用'}</span>`;
-    userArea.innerHTML = `
-      <div class="user-area" onclick="openProfileModal()">
-        <div class="avatar">${avatarHtml}</div>
-        <span class="nickname">${currentUser.nickname || currentUser.phone.slice(-4)}</span>
-      </div>
-    `;
-  } else {
-    userArea.innerHTML = `<button class="login-btn" onclick="openLoginModal()">登录</button>`;
-  }
-}
-
-// 打开登录弹窗
-function openLoginModal() {
-  document.getElementById('login-phone').value = '';
-  document.getElementById('login-code').value = '';
-  document.getElementById('code-area').style.display = 'none';
-  document.getElementById('login-submit-btn').textContent = '获取验证码';
-  tempVerifyCode = '';
-  document.getElementById('login-modal').classList.add('show');
-}
-
-function closeLoginModal() {
-  document.getElementById('login-modal').classList.remove('show');
-}
-
-// 处理登录提交
-function handleLoginSubmit() {
-  const phone = document.getElementById('login-phone').value.trim();
-  const codeInput = document.getElementById('login-code').value.trim();
-  const btn = document.getElementById('login-submit-btn');
-  
-  // 第一步：验证手机号并生成验证码
-  if (!tempVerifyCode) {
-    if (!/^1\d{10}$/.test(phone)) {
-      alert('请输入正确的手机号');
-      return;
-    }
-    // 生成随机6位验证码
-    tempVerifyCode = Math.floor(100000 + Math.random() * 900000).toString();
-    document.getElementById('verify-code').textContent = tempVerifyCode;
-    document.getElementById('code-area').style.display = 'block';
-    btn.textContent = '登录';
-    return;
-  }
-  
-  // 第二步：验证验证码
-  if (codeInput !== tempVerifyCode) {
-    alert('验证码错误');
-    return;
-  }
-  
-  // 验证成功，登录或注册
-  loginOrRegister(phone);
-}
-
-// 登录或注册
-async function loginOrRegister(phone) {
-  const btn = document.getElementById('login-submit-btn');
-  btn.disabled = true;
-  btn.textContent = '登录中...';
-  
-  try {
-    if (supabase) {
-      // 使用 Supabase
-      let { data: user, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('phone', phone)
-        .single();
-      
-      if (error && error.code === 'PGRST116') {
-        // 用户不存在，创建新用户
-        const { data: newUser, error: createError } = await supabase
-          .from('users')
-          .insert([{ phone, nickname: phone.slice(-4) }])
-          .select()
-          .single();
-        
-        if (createError) throw createError;
-        user = newUser;
-      } else if (error) {
-        throw error;
-      }
-      
-      currentUser = user;
-    } else {
-      // 本地模式
-      currentUser = {
-        id: 'local_' + phone,
-        phone: phone,
-        nickname: phone.slice(-4),
-        avatar_url: null,
-        created_at: new Date().toISOString()
-      };
-    }
-    
-    saveUserToLocal(currentUser);
-    closeLoginModal();
-    renderUserArea();
-    
-    // 重新加载用户的 Pick 数据
-    await loadPicksFromCloud();
-    displayStocks = getPickedStocks();
-    await fetchTencentQuotes();
-    renderAll();
-    
-  } catch (err) {
-    console.error('登录失败:', err);
-    alert('登录失败，请重试');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '登录';
-  }
-}
-
-// 打开个人信息弹窗
-function openProfileModal() {
-  if (!currentUser) return;
-  
-  document.getElementById('profile-phone').value = currentUser.phone;
-  document.getElementById('profile-nickname').value = currentUser.nickname || '';
-  
-  const avatarImg = document.getElementById('profile-avatar');
-  const placeholder = document.getElementById('avatar-placeholder');
-  if (currentUser.avatar_url) {
-    avatarImg.src = currentUser.avatar_url;
-    avatarImg.style.display = 'block';
-    placeholder.style.display = 'none';
-  } else {
-    avatarImg.style.display = 'none';
-    placeholder.style.display = 'block';
-  }
-  
-  document.getElementById('profile-modal').classList.add('show');
-}
-
-function closeProfileModal() {
-  document.getElementById('profile-modal').classList.remove('show');
-}
-
-// 处理头像上传
-function handleAvatarChange(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  
-  // 转换为 Base64
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const avatarImg = document.getElementById('profile-avatar');
-    const placeholder = document.getElementById('avatar-placeholder');
-    avatarImg.src = e.target.result;
-    avatarImg.style.display = 'block';
-    placeholder.style.display = 'none';
-  };
-  reader.readAsDataURL(file);
-}
-
-// 保存个人信息
-async function saveProfile() {
-  const nickname = document.getElementById('profile-nickname').value.trim();
-  const avatarImg = document.getElementById('profile-avatar');
-  const avatarUrl = avatarImg.style.display !== 'none' ? avatarImg.src : null;
-  
-  if (!nickname) {
-    alert('请输入昵称');
-    return;
-  }
-  
-  try {
-    if (supabase && currentUser.id && !currentUser.id.startsWith('local_')) {
-      // 更新 Supabase
-      const { error } = await supabase
-        .from('users')
-        .update({ nickname, avatar_url: avatarUrl })
-        .eq('id', currentUser.id);
-      
-      if (error) throw error;
-    }
-    
-    currentUser.nickname = nickname;
-    currentUser.avatar_url = avatarUrl;
-    saveUserToLocal(currentUser);
-    
-    closeProfileModal();
-    renderUserArea();
-    alert('保存成功');
-  } catch (err) {
-    console.error('保存失败:', err);
-    alert('保存失败');
-  }
-}
-
-// 退出登录
-function logout() {
-  if (!confirm('确定要退出登录吗？')) return;
-  
-  currentUser = null;
-  localStorage.removeItem('pick_table_user');
-  closeProfileModal();
-  renderUserArea();
-  
-  // 清空 Pick 数据显示
-  displayStocks = [];
-  realtimeQuotes = {};
-  renderAll();
-}
-
-// ==============================================
-// 2. 配置
+// 1. 配置
 // ==============================================
 // 当前显示的股票列表（默认显示已 pick 的股票，或搜索结果）
 let displayStocks = [];
@@ -454,67 +128,7 @@ function getPickedStocks() {
 }
 
 // ==============================================
-// 3. Pick 数据管理（云端同步）
-// ==============================================
-async function loadPicksFromCloud() {
-  if (!supabase || !currentUser) {
-    return [];
-  }
-  
-  try {
-    const { data, error } = await supabase
-      .from('picks')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    
-    localStorage.setItem('picks_v3', JSON.stringify(data || []));
-    return data || [];
-  } catch (err) {
-    console.error('加载 Picks 失败:', err);
-    return [];
-  }
-}
-
-async function savePicksToCloud(picks) {
-  if (!supabase || !currentUser) {
-    return;
-  }
-  
-  try {
-    // 这里简化处理，实际应该增量更新
-    // 先删除所有旧的
-    await supabase.from('picks').delete().eq('user_id', currentUser.id);
-    
-    // 插入新的
-    const picksToInsert = picks.map(p => ({
-      user_id: currentUser.id,
-      ...p
-    }));
-    
-    await supabase.from('picks').insert(picksToInsert);
-  } catch (err) {
-    console.error('保存 Picks 失败:', err);
-  }
-}
-
-// 重写 getPicks 和 setPicks
-function getPicks() {
-  return JSON.parse(localStorage.getItem('picks_v3') || '[]');
-}
-
-function setPicks(list) {
-  localStorage.setItem('picks_v3', JSON.stringify(list));
-  // 异步保存到云端
-  if (currentUser) {
-    savePicksToCloud(list);
-  }
-}
-
-// ==============================================
-// 3. 搜索接口（全市场搜索）
+// 2. 搜索接口（全市场搜索）
 // ==============================================
 function searchStocks(keyword) {
   return new Promise((resolve) => {
@@ -599,7 +213,7 @@ function searchStocks(keyword) {
 }
 
 // ==============================================
-// 4. 行情接口（兼容 GitHub Pages，使用 JSONP 方式）
+// 3. 行情接口（兼容 GitHub Pages，使用 JSONP 方式）
 // ==============================================
 function fetchTencentQuotes() {
   return new Promise((resolve) => {
@@ -680,7 +294,7 @@ function fetchTencentQuotes() {
 }
 
 // ==============================================
-// 5. 逻辑引擎
+// 3. 逻辑引擎
 // ==============================================
 function getPicks() { return JSON.parse(localStorage.getItem("picks_v3") || "[]"); }
 function setPicks(list) { localStorage.setItem("picks_v3", JSON.stringify(list)); }
@@ -713,7 +327,7 @@ function checkTriggers() {
 }
 
 // ==============================================
-// 6. UI 渲染
+// 5. UI 渲染
 // ==============================================
 function renderMarket() {
   const listEl = document.getElementById("stock-list");
@@ -1053,7 +667,7 @@ async function manualRefresh() {
 }
 
 // ==============================================
-// 7. 启动与循环
+// 6. 启动与循环
 // ==============================================
 // 获取策略中股票的行情
 async function fetchPicksQuotes() {
@@ -1119,21 +733,9 @@ async function loop() {
 }
 
 // 初始化
-const hasSupabase = initSupabase();
-loadUserFromLocal();
-renderUserArea();
-
-// 加载用户的 Pick 数据
-if (currentUser) {
-  loadPicksFromCloud().then(() => {
-    displayStocks = getPickedStocks();
-    loop();
-  });
-} else {
-  loop();
-}
-
-setInterval(loop, 8000); // 每 8 秒自动更新
+displayStocks = getPickedStocks();
+loop();
+setInterval(loop, 8000); // 每8秒自动更新
 </script>
 </body>
 </html>
